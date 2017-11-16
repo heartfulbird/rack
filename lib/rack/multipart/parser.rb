@@ -1,4 +1,3 @@
-
 require 'rack/utils'
 
 module Rack
@@ -25,10 +24,10 @@ module Rack
           left = @content_length - @cursor
 
           str = if left < size
-            @io.read left
-          else
-            @io.read size
-          end
+                  @io.read left
+                else
+                  @io.read size
+                end
 
           if str
             @cursor += str.bytesize
@@ -167,7 +166,6 @@ module Rack
 
       def initialize(boundary, tempfile, bufsize, query_parser)
         @buf            = String.new
-        @buf_rx_start   = 0
 
         @query_parser   = query_parser
         @params         = query_parser.make_params
@@ -176,14 +174,12 @@ module Rack
         @bufsize        = bufsize
 
         @rx = /(?:#{EOL})?#{Regexp.quote(@boundary)}(#{EOL}|--)/n
-        @rx_max_size = EOL.size + @boundary.size + [EOL.size, '--'.size].max
         @full_boundary = @boundary
         @end_boundary = @boundary + '--'
         @state = :FAST_FORWARD
         @mime_index = 0
         @collector = Collector.new tempfile
       end
-
 
       def on_read content, eof
         handle_empty_content!(content, eof)
@@ -207,16 +203,16 @@ module Rack
       def run_parser
         loop do
           case @state
-            when :FAST_FORWARD
-              break if handle_fast_forward == :want_read
-            when :CONSUME_TOKEN
-              break if handle_consume_token == :want_read
-            when :MIME_HEAD
-              break if handle_mime_head == :want_read
-            when :MIME_BODY
-              break if handle_mime_body == :want_read
-            when :DONE
-              break
+          when :FAST_FORWARD
+            break if handle_fast_forward == :want_read
+          when :CONSUME_TOKEN
+            break if handle_consume_token == :want_read
+          when :MIME_HEAD
+            break if handle_mime_head == :want_read
+          when :MIME_BODY
+            break if handle_mime_body == :want_read
+          when :DONE
+            break
           end
         end
       end
@@ -267,15 +263,15 @@ module Rack
       end
 
       def handle_mime_body
-        if i = @buf.index(rx, @buf_rx_start)
+        if @buf =~ rx
           # Save the rest.
-          @collector.on_mime_body @mime_index, @buf.slice!(0, i)
-          @buf.slice!(0, 2) # Remove \r\n after the content
-          @buf_rx_start = 0 # Reset rx search position
+          if i = @buf.index(rx)
+            @collector.on_mime_body @mime_index, @buf.slice!(0, i)
+            @buf.slice!(0, 2) # Remove \r\n after the content
+          end
           @state = :CONSUME_TOKEN
           @mime_index += 1
         else
-          @buf_rx_start = [@buf_rx_start, @buf.size - @rx_max_size].max
           :want_read
         end
       end
@@ -288,8 +284,8 @@ module Rack
         while @buf.gsub!(/\A([^\n]*(?:\n|\Z))/, '')
           read_buffer = $1
           case read_buffer.strip
-            when full_boundary then return :BOUNDARY
-            when @end_boundary then return :END_BOUNDARY
+          when full_boundary then return :BOUNDARY
+          when @end_boundary then return :END_BOUNDARY
           end
           return if @buf.empty?
         end
@@ -298,16 +294,16 @@ module Rack
       def get_filename(head)
         filename = nil
         case head
-          when RFC2183
-            params = Hash[*head.scan(DISPPARM).flat_map(&:compact)]
+        when RFC2183
+          params = Hash[*head.scan(DISPPARM).flat_map(&:compact)]
 
-            if filename = params['filename']
-              filename = $1 if filename =~ /^"(.*)"$/
-            elsif filename = params['filename*']
-              encoding, _, filename = filename.split("'", 3)
-            end
-          when BROKEN_QUOTED, BROKEN_UNQUOTED
-            filename = $1
+          if filename = params['filename']
+            filename = $1 if filename =~ /^"(.*)"$/
+          elsif filename = params['filename*']
+            encoding, _, filename = filename.split("'", 3)
+          end
+        when BROKEN_QUOTED, BROKEN_UNQUOTED
+          filename = $1
         end
 
         return unless filename
